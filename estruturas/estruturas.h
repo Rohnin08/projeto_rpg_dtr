@@ -9,22 +9,15 @@ typedef enum
     HANAE
 } TipoPersonagem;
 
-typedef enum
-{
-    TIPO_ESPECTRO = 1,
-    TIPO_BESTA,
-    TIPO_CHEFE
-
-} TipoMonstro;
-
 // struct do Personagem
-
 typedef struct
 {
     char nome[50];
     char classe[40];
     int vidaAtual,
         vidaMax,
+        manaAtual,
+        manaMax,
         forca,
         defesa,
         agilidade,

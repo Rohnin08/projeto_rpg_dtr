@@ -10,103 +10,53 @@
 
 void gerarMonstro(Monstro *m, int fase, int indice)
 {
-    // Aplica o fator de escala exponencial exigido pela prova usando math.h (pow)
     double fator = pow(1.25, fase - 1);
 
-    if (fase == 1)
-    {
-        if (indice == 0)
-        {
-            strcpy(m->nome, "Diabrete das Sombras");
-            m->vidaMax = (int)(30 * fator);
-            m->vidaAtual = m->vidaMax;
-            m->forca = 8;
-            m->defesa = 4;
-            m->agilidade = 5;
-        }
-        else if (indice == 1)
-        {
-            strcpy(m->nome, "Possuido Infernal");
-            m->vidaMax = (int)(45 * fator);
-            m->vidaAtual = m->vidaMax;
-            m->forca = 11;
-            m->defesa = 6;
-            m->agilidade = 8;
-        }
-        else
-        {
-            strcpy(m->nome, "Malphas, O Vigia das Fendas (Chefe)");
-            m->vidaMax = (int)(70 * fator);
-            m->vidaAtual = m->vidaMax;
-            m->forca = 14;
-            m->defesa = 8;
-            m->agilidade = 10;
-        }
-    }
-    else if (fase == 2)
-    {
-        if (indice == 0)
-        {
-            strcpy(m->nome, "Cao de Caca do Inferno");
-            m->vidaMax = (int)(60 * fator);
-            m->vidaAtual = m->vidaMax;
-            m->forca = 15;
-            m->defesa = 9;
-            m->agilidade = 6;
-        }
-        else if (indice == 1)
-        {
-            strcpy(m->nome, "Sucubo das Cinzas");
-            m->vidaMax = (int)(75 * fator);
-            m->vidaAtual = m->vidaMax;
-            m->forca = 18;
-            m->defesa = 10;
-            m->agilidade = 14;
-        }
-        else
-        {
-            strcpy(m->nome, "Astaroth, O Duque das Cinzas (Chefe)");
-            m->vidaMax = (int)(100 * fator);
-            m->vidaAtual = m->vidaMax;
-            m->forca = 22;
-            m->defesa = 12;
-            m->agilidade = 12;
-        }
-    }
-    else
-    {
-        if (indice == 0)
-        {
-            strcpy(m->nome, "Berserker Abissal");
-            m->vidaMax = (int)(90 * fator);
-            m->vidaAtual = m->vidaMax;
-            m->forca = 24;
-            m->defesa = 14;
-            m->agilidade = 9;
-        }
-        else if (indice == 1)
-        {
-            strcpy(m->nome, "Guardiao de Obsidiana");
-            m->vidaMax = (int)(120 * fator);
-            m->vidaAtual = m->vidaMax;
-            m->forca = 28;
-            m->defesa = 18;
-            m->agilidade = 4;
-        }
-        else
-        {
-            strcpy(m->nome, "Belz, O Principe do Submundo (Chefe Final)");
-            m->vidaMax = (int)(180 * fator);
-            m->vidaAtual = m->vidaMax;
-            m->forca = 35;
-            m->defesa = 20;
-            m->agilidade = 15;
-        }
-    }
+    // Ordem: {vidaBase, forca, defesa, agilidade}
+    const int atributosBase[3][3][4] = {
+        // Fase 1
+        {{30, 8, 4, 5}, {45, 11, 6, 8}, {70, 14, 8, 10}},
+        // Fase 2
+        {{60, 15, 9, 6}, {75, 18, 10, 14}, {100, 22, 12, 12}},
+        // Fase 3
+        {{90, 24, 14, 9}, {120, 28, 18, 4}, {180, 35, 20, 15}}};
+
+    const char *nomesMonstros[3][3] = {
+        // Fase 1
+        {"Diabrete", "Possuido Infernal", "Malphas, O Vigia das Fendas"},
+        // Fase 2
+        {"Hellhound", "Sucubo", "Astaroth, O Duque das Cinzas"},
+        // Fase 3
+        {"Berserker Abissal", "Guardiao de Obsidiana", "Satanael, O Principe do Submundo"}};
+
+    int fIdx = fase - 1;
+    int mIdx = indice;
+
+    if (fIdx < 0)
+        fIdx = 0;
+    if (fIdx > 2)
+        fIdx = 2;
+    if (mIdx < 0)
+        mIdx = 0;
+    if (mIdx > 2)
+        mIdx = 2;
+
+    strcpy(m->nome, nomesMonstros[fIdx][mIdx]);
+
+    int vidaBase = atributosBase[fIdx][mIdx][0];
+    m->vidaMax = (int)(vidaBase * fator);
+    m->vidaAtual = m->vidaMax;
+
+    m->forca = atributosBase[fIdx][mIdx][1];
+    m->defesa = atributosBase[fIdx][mIdx][2];
+    m->agilidade = atributosBase[fIdx][mIdx][3];
 }
 
-void executarCombate(Personagem *p, Monstro *m)
+void executarCombate(Personagem *p, Monstro *m, int fase, int ehChefe)
 {
+    p->manaAtual = p->manaMax; // Restaura o MP no inicio de cada combate
+    const int CUSTO_ESPECIAL = 10;
+
     printf("\n====================================================\n");
     printf(" ENCONTRO COM DEMONIO: %s\n", m->nome);
     printf("====================================================\n");
@@ -114,9 +64,10 @@ void executarCombate(Personagem *p, Monstro *m)
     while (p->vidaAtual > 0 && m->vidaAtual > 0)
     {
         printf("\n--- Status do Combate ---\n");
-        printf("Seu HP: %d/%d | %s HP: %d/%d\n", p->vidaAtual, p->vidaMax, m->nome, m->vidaAtual, m->vidaMax);
+        printf("Seu HP: %d/%d | Seu MP: %d/%d | %s HP: %d/%d\n",
+               p->vidaAtual, p->vidaMax, p->manaAtual, p->manaMax, m->nome, m->vidaAtual, m->vidaMax);
         printf("[1] Atacar Normal\n");
-        printf("[2] Usar Habilidade Especial (%s)\n", p->habilidade);
+        printf("[2] Usar Habilidade Especial (%s) [Custo: %d MP]\n", p->habilidade, CUSTO_ESPECIAL);
         printf("[3] Tentar Fugir\n");
         printf("Escolha sua acao: ");
 
@@ -131,10 +82,8 @@ void executarCombate(Personagem *p, Monstro *m)
 
         if (acao == 1)
         {
-            // Ataque Normal (d20 + Força vs Defesa do Monstro)
             int dado = rolarDado(20);
             int ataqueTotal = dado + p->forca;
-            // Usa fmax para garantir dano mínimo de 1 (exigência de math.h)
             int dano = (int)fmax(1.0, (double)(ataqueTotal - m->defesa));
             m->vidaAtual -= dano;
 
@@ -143,27 +92,42 @@ void executarCombate(Personagem *p, Monstro *m)
         }
         else if (acao == 2)
         {
-            // Habilidade Especial (bônus baseado em Inteligência e Força)
+            if (p->manaAtual < CUSTO_ESPECIAL)
+            {
+                printf(">> MP INSUFICIENTE! Voce nao tem energia espiritual para usar '%s'!\n", p->habilidade);
+                continue;
+            }
+
+            p->manaAtual -= CUSTO_ESPECIAL;
+
             int dado = rolarDado(20);
             int ataqueTotal = dado + p->inteligencia + p->forca;
             int dano = (int)fmax(1.0, (double)((ataqueTotal * 1.5) - m->defesa));
             m->vidaAtual -= dano;
 
-            printf(">> Usou a habilidade '%s'! Rolou %d.\n", p->habilidade, dado);
+            printf(">> Usou '%s' (-%d MP)! Rolou %d.\n", p->habilidade, CUSTO_ESPECIAL, dado);
             printf(">> Dano critico de exorcismo de %d em %s!\n", dano, m->nome);
         }
         else if (acao == 3)
         {
-            printf(">> Voce recuou taticamente do combate!\n");
-            p->vidaAtual -= 15; // Penalidade por fuga
-            return;
+            if (ehChefe)
+            {
+                printf(">> Voce nao pode fugir de um General Demoniaco!\n");
+            }
+            else
+            {
+                printf(">> Voce recuou taticamente do combate! (-15 HP)\n");
+                p->vidaAtual -= 15;
+                pausar();
+                return;
+            }
         }
         else
         {
             printf("Acao desconhecida! O demonio aproveitou sua hesitacao.\n");
         }
 
-        // Turno do Demônio (caso ele sobreviva)
+        // Turno do Demonio (caso ele sobreviva)
         if (m->vidaAtual > 0)
         {
             int dadoM = rolarDado(20);
@@ -179,17 +143,60 @@ void executarCombate(Personagem *p, Monstro *m)
     if (p->vidaAtual > 0)
     {
         printf("\n[VITORIA] Voce exorcizou %s com sucesso!\n", m->nome);
-        aplicarRecompensa(p, m);
+        aplicarRecompensa(p, m, fase, ehChefe);
     }
 }
 
-void aplicarRecompensa(Personagem *p, Monstro *m)
+void aplicarRecompensa(Personagem *p, Monstro *m, int fase, int ehChefe)
 {
+    (void)m; // Evita warning de parametro nao utilizado
+
+    if (ehChefe)
+    {
+        printf("\n====================================================\n");
+        printf(" RECOMPENSA DE CHEFE: ESSENCIA DEMONIACA PURIFICADA!\n");
+        printf("====================================================\n");
+
+        // Aumenta todos os atributos em 10% (arredondando para cima via ceil)
+        p->vidaMax = (int)ceil(p->vidaMax * 1.10);
+        p->vidaAtual = p->vidaMax;
+        p->manaMax = (int)ceil(p->manaMax * 1.10);
+        p->manaAtual = p->manaMax;
+        p->forca = (int)ceil(p->forca * 1.10);
+        p->defesa = (int)ceil(p->defesa * 1.10);
+        p->agilidade = (int)ceil(p->agilidade * 1.10);
+        p->inteligencia = (int)ceil(p->inteligencia * 1.10);
+
+        // Tabela de evolucao de armas: [Classe 0-2][Fase 0-2]
+        const char *armasEvoluidas[3][3] = {
+            // Ken Matsudaira
+            {"Katana Amaldicoada Muramasa", "Lamina Espiritual Kusanagi", "Espada Divina Ame-no-Habakiri"},
+            // Satoshi Hasegawa
+            {"Pistolas de Prata Consagrada", "Revolveres Duplos Cerberus", "Canhoes Arcanos Seraphim"},
+            // Hanae Suda
+            {"Grimorio das Chamas Puras", "Codex Selado de Salomao", "Tomo Supremo Akashico"}};
+
+        int classeIdx = 0; // Ken
+        if (strcmp(p->nome, "Satoshi Hasegawa") == 0)
+            classeIdx = 1;
+        else if (strcmp(p->nome, "Hanae Suda") == 0)
+            classeIdx = 2;
+
+        int faseIdx = (fase >= 1 && fase <= 3) ? fase - 1 : 0;
+        strcpy(p->arma, armasEvoluidas[classeIdx][faseIdx]);
+
+        printf(">> TODOS os seus atributos aumentaram em +10%% e seu HP/MP foram restaurados!\n");
+        printf(">> NOVA ARMA EQUIPADA: %s!\n", p->arma);
+        exibirStatusPersonagem(p);
+        pausar();
+        return;
+    }
+
+    // Recompensa padrao para demonios comuns
     printf(">> Recompensa espiritual obtida!\n");
 
-    // Sorteio aleatório de qual atributo vai subir (0 a 4)
     int atributoSorteado = rand() % 5;
-    int bonus = (rand() % 3) + 2; // Bônus entre 2 e 4
+    int bonus = (rand() % 3) + 2;
 
     if (atributoSorteado == 0)
     {
@@ -214,53 +221,50 @@ void aplicarRecompensa(Personagem *p, Monstro *m)
     else
     {
         p->vidaMax += (bonus * 5);
-        p->vidaAtual = p->vidaMax; // Cura total ao upar vida máxima
+        p->vidaAtual = p->vidaMax;
         printf(">> EVOLUCAO: Sua Vida Maxima aumentou! HP totalmente restaurado (%d)\n", p->vidaMax);
     }
     pausar();
 }
 
-void iniciarFase(Personagem *p, int numeroFase, const char *nomeFase, const char *missao)
+void iniciarFase(Personagem *p, const Missao *missao)
 {
     printf("\n====================================================\n");
-    printf(" FASE %d: %s\n", numeroFase, nomeFase);
-    printf(" Missao: %s\n", missao);
+    printf(" FASE %d\n", missao->idFase);
+    printf(" Missao: %s\n", missao->descricao);
     printf("====================================================\n");
     pausar();
 
     int posicao = 0;
 
-    // Loop do tabuleiro da fase atual
     while (posicao < TAM_TABULEIRO && p->vidaAtual > 0)
     {
         int dadoMovimento = rolarDado(6);
         posicao += dadoMovimento;
         if (posicao >= TAM_TABULEIRO)
         {
-            posicao = TAM_TABULEIRO; // Trava na última casa do tabuleiro (Covil do Chefe)
+            posicao = TAM_TABULEIRO;
         }
 
         printf("\n----------------------------------------------------\n");
         printf("Voce avancou %d casas no territorio. Posicao atual: %d/%d\n", dadoMovimento, posicao, TAM_TABULEIRO);
 
-        // Sorteia o tipo de evento da casa (0: Combate, 1: Tesouro, 2: Cura, 3: Armadilha, 4: Vazio)
         int tipoEvento = rand() % 5;
 
-        // Se cair na última casa (chefe), o combate contra o líder da fase é obrigatório
         if (posicao == TAM_TABULEIRO)
         {
-            printf("[CONfronto FINAL] Voce encontrou o general demoniaco desta regiao!\n");
+            printf("[CONFRONTO FINAL] Voce encontrou o general demoniaco desta regiao!\n");
             Monstro boss;
-            gerarMonstro(&boss, numeroFase, 2); // Índice 2 é sempre o Chefe da Fase
-            executarCombate(p, &boss);
+            gerarMonstro(&boss, missao->idFase, 2);
+            executarCombate(p, &boss, missao->idFase, 1);
         }
         else if (tipoEvento == 0)
         {
             printf("[EVENTO DE COMBATE] Um demonio selvagem apareceu para bloquear seu caminho!\n");
             Monstro m;
-            int indiceMonstro = rand() % 2; // Sorteia entre os demônios comuns (0 ou 1)
-            gerarMonstro(&m, numeroFase, indiceMonstro);
-            executarCombate(p, &m);
+            int indiceMonstro = rand() % 2;
+            gerarMonstro(&m, missao->idFase, indiceMonstro);
+            executarCombate(p, &m, missao->idFase, 0);
         }
         else if (tipoEvento == 1)
         {
@@ -274,7 +278,9 @@ void iniciarFase(Personagem *p, int numeroFase, const char *nomeFase, const char
         {
             int cura = 25;
             p->vidaAtual = (p->vidaAtual + cura > p->vidaMax) ? p->vidaMax : p->vidaAtual + cura;
-            printf("[EVENTO DE CURA] Voce encontrou um santuario de purificacao! HP recuperado (%d/%d).\n", p->vidaAtual, p->vidaMax);
+            p->manaAtual = p->manaMax;
+            printf("[EVENTO DE CURA] Voce encontrou um santuario de purificacao! HP (%d/%d) e MP (%d/%d) restaurados.\n",
+                   p->vidaAtual, p->vidaMax, p->manaAtual, p->manaMax);
             pausar();
         }
         else if (tipoEvento == 3)
@@ -296,7 +302,7 @@ void iniciarFase(Personagem *p, int numeroFase, const char *nomeFase, const char
 
     if (p->vidaAtual > 0)
     {
-        printf("\n[REGIAO LIBERTADA] Voce concluiu com sucesso a Fase %d!\n", numeroFase);
+        printf("\n[REGIAO LIBERTADA] Voce concluiu com sucesso a Fase %d!\n", missao->idFase);
         pausar();
     }
 }

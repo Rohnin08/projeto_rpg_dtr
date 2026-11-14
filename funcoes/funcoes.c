@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include "funcoes.h"
 
 void exibirMenuPrincipal()
@@ -13,55 +12,63 @@ void exibirMenuPrincipal()
     printf("Escolha uma opcao: ");
 }
 
-void escolherPersonagem(Personagem *p, int escolha)
+int rolarDado(int faces)
 {
-    switch (escolha)
-    {
-    case KEN:
-        strcpy(p->nome, "Ken Matsudaira");
-        strcpy(p->classe, "Espadachim sobrenatural");
-        strcpy(p->roupa, "Camiseta");
-        strcpy(p->arma, "Katana Simples");
-        strcpy(p->habilidade, "Corte do Juizo Final");
-        p->vidaMax = 120;
-        p->vidaAtual = 120;
-        p->forca = 12;
-        p->defesa = 10;
-        p->agilidade = 5;
-        p->inteligencia = 5;
-        break;
-
-    case SATOSHI:
-        strcpy(p->nome, "Satoshi Hasegawa");
-        strcpy(p->classe, "Atirador espiritual");
-        strcpy(p->roupa, "Casaco");
-        strcpy(p->arma, "Pistolas gemeas");
-        strcpy(p->habilidade, "Rajada de Balas Espirituais");
-        p->vidaMax = 100;
-        p->vidaAtual = 100;
-        p->forca = 8;
-        p->defesa = 7;
-        p->agilidade = 13;
-        p->inteligencia = 6;
-        break;
-
-    case HANAE:
-    default:
-        strcpy(p->nome, "Hanae Suda");
-        strcpy(p->classe, "Maga exorcista");
-        strcpy(p->roupa, "Vestido");
-        strcpy(p->arma, "Tomo Sagrado");
-        strcpy(p->habilidade, "Exorcismo de Chamas Sagradas");
-        p->vidaMax = 80;
-        p->vidaAtual = 80;
-        p->forca = 5;
-        p->defesa = 5;
-        p->agilidade = 6;
-        p->inteligencia = 14;
-        break;
-    }
+    return (rand() % faces) + 1;
 }
 
+void escolherPersonagem(Personagem *p, int escolha)
+{
+    const Personagem modelos[3] = {
+        {
+            .nome = "Ken Matsudaira",
+            .classe = "Espadachim sobrenatural",
+            .roupa = "Camiseta",
+            .arma = "Katana Simples",
+            .habilidade = "Corte do Juizo Final",
+            .vidaMax = 120,
+            .vidaAtual = 120,
+            .manaMax = 30,
+            .manaAtual = 30,
+            .forca = 12,
+            .defesa = 10,
+            .agilidade = 5,
+            .inteligencia = 5,
+        },
+        {
+            .nome = "Satoshi Hasegawa",
+            .classe = "Atirador espiritual",
+            .roupa = "Casaco",
+            .arma = "Pistolas gemeas",
+            .habilidade = "Rajada de Balas Espirituais",
+            .vidaMax = 100,
+            .vidaAtual = 100,
+            .manaMax = 40,
+            .manaAtual = 40,
+            .forca = 8,
+            .defesa = 7,
+            .agilidade = 13,
+            .inteligencia = 6,
+        },
+        {
+            .nome = "Hanae Suda",
+            .classe = "Maga exorcista",
+            .roupa = "Vestido",
+            .arma = "Tomo Sagrado",
+            .habilidade = "Exorcismo de Chamas Sagradas",
+            .vidaMax = 80,
+            .vidaAtual = 80,
+            .manaMax = 50,
+            .manaAtual = 50,
+            .forca = 5,
+            .defesa = 5,
+            .agilidade = 6,
+            .inteligencia = 14,
+        }};
+
+    // Como o main já validou que 'escolha' está entre 1 e 3, basta subtrair 1
+    *p = modelos[escolha - 1];
+}
 void exibirStatusPersonagem(const Personagem *p)
 {
     printf("\n----------------------------------------\n");
@@ -74,9 +81,13 @@ void exibirStatusPersonagem(const Personagem *p)
     printf("----------------------------------------\n");
 }
 
-int rolarDado(int faces)
+void limparTela(void)
 {
-    return (rand() % faces) + 1;
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
 }
 
 void pausar(void)
@@ -86,4 +97,5 @@ void pausar(void)
     while ((c = getchar()) != '\n' && c != EOF)
         ;
     getchar();
+    limparTela();
 }
