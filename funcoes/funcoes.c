@@ -96,6 +96,5 @@ void pausar(void)
     printf("\nPressione ENTER para continuar...");
     while ((c = getchar()) != '\n' && c != EOF)
         ;
-    getchar();
     limparTela();
 }
