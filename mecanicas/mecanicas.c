@@ -63,12 +63,18 @@ void executarCombate(Personagem *p, Monstro *m, int fase, int ehChefe)
 
     while (p->vidaAtual > 0 && m->vidaAtual > 0)
     {
+        // Calcula 25% do atributo maximo atual (arredondado para cima)
+        int curaPocao = (int)ceil(p->vidaMax * 0.25);
+        int recuperaEter = (int)ceil(p->manaMax * 0.25);
+
         printf("\n--- Status do Combate ---\n");
         printf("Seu HP: %d/%d | Seu MP: %d/%d | %s HP: %d/%d\n",
                p->vidaAtual, p->vidaMax, p->manaAtual, p->manaMax, m->nome, m->vidaAtual, m->vidaMax);
         printf("[1] Atacar Normal\n");
         printf("[2] Usar Habilidade Especial (%s) [Custo: %d MP]\n", p->habilidade, CUSTO_ESPECIAL);
-        printf("[3] Tentar Fugir\n");
+        printf("[3] Usar Pocao (+%d HP / 25%%) [Restantes: %d]\n", curaPocao, p->pocoes);
+        printf("[4] Usar Eter (+%d MP / 25%%) [Restantes: %d]\n", recuperaEter, p->eteres);
+        printf("[5] Tentar Fugir\n");
         printf("Escolha sua acao: ");
 
         int acao;
@@ -109,6 +115,42 @@ void executarCombate(Personagem *p, Monstro *m, int fase, int ehChefe)
             printf(">> Dano critico de exorcismo de %d em %s!\n", dano, m->nome);
         }
         else if (acao == 3)
+        {
+            if (p->pocoes <= 0)
+            {
+                printf(">> Voce nao possui mais Pocoes!\n");
+                continue;
+            }
+            if (p->vidaAtual == p->vidaMax)
+            {
+                printf(">> Seu HP ja esta no maximo!\n");
+                continue;
+            }
+
+            p->pocoes--;
+            p->vidaAtual = (p->vidaAtual + curaPocao > p->vidaMax) ? p->vidaMax : p->vidaAtual + curaPocao;
+            printf(">> Voce bebeu uma Pocao (+%d HP)! HP atual: %d/%d (Restam %d pocoes).\n",
+                   curaPocao, p->vidaAtual, p->vidaMax, p->pocoes);
+        }
+        else if (acao == 4)
+        {
+            if (p->eteres <= 0)
+            {
+                printf(">> Voce nao possui mais Eteres!\n");
+                continue;
+            }
+            if (p->manaAtual == p->manaMax)
+            {
+                printf(">> Seu MP ja esta no maximo!\n");
+                continue;
+            }
+
+            p->eteres--;
+            p->manaAtual = (p->manaAtual + recuperaEter > p->manaMax) ? p->manaMax : p->manaAtual + recuperaEter;
+            printf(">> Voce usou um Eter (+%d MP)! MP atual: %d/%d (Restam %d eteres).\n",
+                   recuperaEter, p->manaAtual, p->manaMax, p->eteres);
+        }
+        else if (acao == 5)
         {
             if (ehChefe)
             {
@@ -153,28 +195,44 @@ void aplicarRecompensa(Personagem *p, Monstro *m, int fase, int ehChefe)
 
     if (ehChefe)
     {
+        // Se for o ultimo chefe (Fase 3 - Satanael), encerra direto sem aplicar buff
+        if (fase >= 3)
+        {
+            printf("\n====================================================\n");
+            printf(" O SENHOR DO SUBMUNDO FOI SELADO DEFINITIVAMENTE!\n");
+            printf("====================================================\n");
+            pausar();
+            return;
+        }
+
+        // Multiplicador por fase: Fase 1 -> +10% (1.10) | Fase 2 -> +20% (1.20)
+        const double multiplicadores[2] = {1.10, 1.20};
+        int faseIdx = (fase == 2) ? 1 : 0;
+        double mult = multiplicadores[faseIdx];
+        int porcentagem = (fase == 2) ? 20 : 10;
+
         printf("\n====================================================\n");
-        printf(" RECOMPENSA DE CHEFE: ESSENCIA DEMONIACA PURIFICADA!\n");
+        printf(" RECOMPENSA DE CHEFE: ESSENCIA DEMONIACA ABSORVIDA!\n");
         printf("====================================================\n");
 
-        // Aumenta todos os atributos em 10% (arredondando para cima via ceil)
-        p->vidaMax = (int)ceil(p->vidaMax * 1.10);
+        // Aplica o multiplicador da fase atual em todos os atributos
+        p->vidaMax = (int)ceil(p->vidaMax * mult);
         p->vidaAtual = p->vidaMax;
-        p->manaMax = (int)ceil(p->manaMax * 1.10);
+        p->manaMax = (int)ceil(p->manaMax * mult);
         p->manaAtual = p->manaMax;
-        p->forca = (int)ceil(p->forca * 1.10);
-        p->defesa = (int)ceil(p->defesa * 1.10);
-        p->agilidade = (int)ceil(p->agilidade * 1.10);
-        p->inteligencia = (int)ceil(p->inteligencia * 1.10);
+        p->forca = (int)ceil(p->forca * mult);
+        p->defesa = (int)ceil(p->defesa * mult);
+        p->agilidade = (int)ceil(p->agilidade * mult);
+        p->inteligencia = (int)ceil(p->inteligencia * mult);
 
-        // Tabela de evolucao de armas: [Classe 0-2][Fase 0-2]
-        const char *armasEvoluidas[3][3] = {
-            // Ken Matsudaira
-            {"Katana Amaldicoada Muramasa", "Lamina Espiritual Kusanagi", "Espada Divina Ame-no-Habakiri"},
-            // Satoshi Hasegawa
-            {"Pistolas de Prata Consagrada", "Revolveres Duplos Cerberus", "Canhoes Arcanos Seraphim"},
-            // Hanae Suda
-            {"Grimorio das Chamas Puras", "Codex Selado de Salomao", "Tomo Supremo Akashico"}};
+        // Tabela de evolucao de armas: [Classe 0-2][Fase 0-1]
+        const char *armasEvoluidas[3][2] = {
+            // Ken Matsudaira (Chefe 1 / Chefe 2)
+            {"Katana Amaldicoada Muramasa", "Espada Divina Ame-no-Habakiri"},
+            // Satoshi Hasegawa (Chefe 1 / Chefe 2)
+            {"Pistolas de Prata Consagrada", "Canhoes Arcanos Seraphim"},
+            // Hanae Suda (Chefe 1 / Chefe 2)
+            {"Grimorio das Chamas Puras", "Tomo Supremo Akashico"}};
 
         int classeIdx = 0; // Ken
         if (strcmp(p->nome, "Satoshi Hasegawa") == 0)
@@ -182,10 +240,9 @@ void aplicarRecompensa(Personagem *p, Monstro *m, int fase, int ehChefe)
         else if (strcmp(p->nome, "Hanae Suda") == 0)
             classeIdx = 2;
 
-        int faseIdx = (fase >= 1 && fase <= 3) ? fase - 1 : 0;
         strcpy(p->arma, armasEvoluidas[classeIdx][faseIdx]);
 
-        printf(">> TODOS os seus atributos aumentaram em +10%% e seu HP/MP foram restaurados!\n");
+        printf(">> TODOS os seus atributos aumentaram em +%d%% e seu HP/MP foram restaurados!\n", porcentagem);
         printf(">> NOVA ARMA EQUIPADA: %s!\n", p->arma);
         exibirStatusPersonagem(p);
         pausar();

@@ -25,6 +25,7 @@ typedef struct
     char arma[40];
     char roupa[40];
     char habilidade[50];
+    int pocoes, eteres;
 } Personagem; // Struct para guardar as informações do personagem
 
 typedef struct
