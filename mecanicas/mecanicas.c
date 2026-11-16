@@ -6,7 +6,9 @@
 #include "funcoes.h"
 #include "mecanicas.h"
 
-/* CONSTANTES */
+/* ====================================================================
+ * CONSTANTES
+ * ==================================================================== */
 
 #define CUSTO_ESPECIAL_BASE 10
 
@@ -25,9 +27,17 @@
 #define FUGA_MIN 20
 #define FUGA_MAX 90
 
-/* DADOS ESTATICOS */
+/* Nivel: XP necessario para o proximo nivel = XP_BASE_NIVEL * nivel atual */
+#define XP_BASE_NIVEL 50
+#define NIVEL_BONUS_VIDA 5
+#define NIVEL_BONUS_MANA 2
+#define NIVEL_BONUS_ATRIBUTO 1
 
-/* [Classe 0-2][Chefe 0-1] */
+/* ====================================================================
+ * DADOS ESTATICOS
+ * ==================================================================== */
+
+/* [Classe 0-2][Chefe 0-1] - bonus fixos aplicados uma vez, ao equipar */
 static const Arma armas[3][2] = {
     /* Ken Matsudaira */
     {{"Katana Amaldicoada Muramasa", 0, 0, 3, 0, 0, 0},
@@ -61,17 +71,31 @@ static const Roupa roupas[3][3] = {
       "Fluxo Arcano: habilidade especial custa 4 MP a menos"}}};
 
 /* ====================================================================
+ * DANO VIA PONTEIRO
+ * ==================================================================== */
+
+void receberDano(Personagem *p, int dano)
+{
+    p->vidaAtual -= dano;
+    if (p->vidaAtual < 0)
+        p->vidaAtual = 0;
+}
+
+void danoNoMonstro(Monstro *m, int dano)
+{
+    m->vidaAtual -= dano;
+    if (m->vidaAtual < 0)
+        m->vidaAtual = 0;
+}
+
+/* ====================================================================
  * CLASSE E ROUPA
  * ==================================================================== */
 
-/* Indice da classe (0 Ken, 1 Satoshi, 2 Hanae) a partir do nome */
+/* Indice da classe (0 Ken, 1 Satoshi, 2 Hanae) a partir do enum */
 static int indiceClasse(const Personagem *p)
 {
-    if (strcmp(p->nome, "Satoshi Hasegawa") == 0)
-        return 1;
-    if (strcmp(p->nome, "Hanae Suda") == 0)
-        return 2;
-    return 0;
+    return limitar((int)p->tipo - 1, 0, 2);
 }
 
 /* Roupa atualmente equipada (assume a inicial se o nome nao for encontrado) */
@@ -99,7 +123,9 @@ int reducaoDanoRoupa(const Personagem *p)
     return roupaEquipada(p)->reducaoDano;
 }
 
-/* ATAQUE, ESQUIVA E FUGA */
+/* ====================================================================
+ * ATAQUE, ESQUIVA E FUGA
+ * ==================================================================== */
 
 /* Dano = ataque - defesa, com minimo garantido de 1 */
 static int calcularDano(double ataque, int defesa)
@@ -125,7 +151,6 @@ int resolverAtaque(int dado, double ataque, int defesa, int *critico)
 }
 
 int chanceEsquiva(const Personagem *p, const Monstro *m)
-/*Utiliza uma operação para */
 {
     int chance = ESQUIVA_POR_AGI * (p->agilidade - m->agilidade) + roupaEquipada(p)->esquivaExtra;
 
@@ -134,12 +159,55 @@ int chanceEsquiva(const Personagem *p, const Monstro *m)
 
 int chanceFuga(const Personagem *p, const Monstro *m)
 {
-    return limitar(FUGA_BASE + FUGA_POR_AGI * (p->agilidade - m->agilidade), FUGA_MIN, FUGA_MAX);
+    return limitar(FUGA_BASE + FUGA_POR_AGI * (p->agilidade - m->agilidade),
+                   FUGA_MIN, FUGA_MAX);
 }
 
 int sortearChance(int chance)
 {
     return (rand() % 100) < chance;
+}
+
+/* ====================================================================
+ * XP E NIVEL
+ * ==================================================================== */
+
+static int xpParaProximoNivel(int nivel)
+{
+    return XP_BASE_NIVEL * nivel;
+}
+
+static void subirDeNivel(Personagem *p)
+{
+    p->nivel++;
+
+    p->vidaMax += NIVEL_BONUS_VIDA;
+    p->vidaAtual += NIVEL_BONUS_VIDA;
+    p->manaMax += NIVEL_BONUS_MANA;
+    p->manaAtual += NIVEL_BONUS_MANA;
+    p->forca += NIVEL_BONUS_ATRIBUTO;
+    p->defesa += NIVEL_BONUS_ATRIBUTO;
+    p->agilidade += NIVEL_BONUS_ATRIBUTO;
+    p->inteligencia += NIVEL_BONUS_ATRIBUTO;
+
+    printf(">> SUBIU DE NIVEL! Agora voce e nivel %d!\n", p->nivel);
+    printf(">> Bonus: +%d HP +%d MP +%d Forca +%d Defesa +%d Agilidade +%d Inteligencia\n",
+           NIVEL_BONUS_VIDA, NIVEL_BONUS_MANA, NIVEL_BONUS_ATRIBUTO,
+           NIVEL_BONUS_ATRIBUTO, NIVEL_BONUS_ATRIBUTO, NIVEL_BONUS_ATRIBUTO);
+}
+
+void ganharXP(Personagem *p, int xp)
+{
+    printf(">> Voce ganhou %d XP!\n", xp);
+    p->xp += xp;
+
+    while (p->xp >= xpParaProximoNivel(p->nivel))
+    {
+        p->xp -= xpParaProximoNivel(p->nivel);
+        subirDeNivel(p);
+    }
+
+    printf(">> Nivel %d | XP: %d/%d\n", p->nivel, p->xp, xpParaProximoNivel(p->nivel));
 }
 
 /* ====================================================================
@@ -281,7 +349,7 @@ static void recompensaComum(Personagem *p)
 
 void aplicarRecompensa(Personagem *p, Monstro *m, int fase, int ehChefe)
 {
-    (void)m; /* evita warning de parametro nao utilizado */
+    ganharXP(p, m->xpRecompensa);
 
     if (!ehChefe)
         recompensaComum(p);

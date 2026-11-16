@@ -14,6 +14,7 @@
 
 static const Personagem modelos[TOTAL_PERSONAGENS] = {
     {.nome = "Ken Matsudaira",
+     .tipo = KEN,
      .classe = "Espadachim sobrenatural",
      .roupa = "Camiseta",
      .arma = "Katana Simples",
@@ -25,6 +26,7 @@ static const Personagem modelos[TOTAL_PERSONAGENS] = {
      .agilidade = 5,
      .inteligencia = 5},
     {.nome = "Satoshi Hasegawa",
+     .tipo = SATOSHI,
      .classe = "Atirador espiritual",
      .roupa = "Casaco",
      .arma = "Pistolas Gemeas",
@@ -36,6 +38,7 @@ static const Personagem modelos[TOTAL_PERSONAGENS] = {
      .agilidade = 13,
      .inteligencia = 6},
     {.nome = "Hanae Suda",
+     .tipo = HANAE,
      .classe = "Maga exorcista",
      .roupa = "Vestido",
      .arma = "Tomos Sagrados",
@@ -133,6 +136,7 @@ void exibirStatusPersonagem(const Personagem *p)
 {
     printf("\n----------------------------------------\n");
     printf(" Exterminador: %s (%s)\n", p->nome, p->classe);
+    printf(" Nivel: %d | XP: %d\n", p->nivel, p->xp);
     printf(" HP: %d / %d | MP: %d / %d\n", p->vidaAtual, p->vidaMax, p->manaAtual, p->manaMax);
     printf(" Forca: %d | Defesa: %d | Agilidade: %d | Inteligencia: %d\n",
            p->forca, p->defesa, p->agilidade, p->inteligencia);
@@ -140,6 +144,38 @@ void exibirStatusPersonagem(const Personagem *p)
     printf(" Habilidade Especial: %s\n", p->habilidade);
     printf(" Pocoes: %d | Eteres: %d\n", p->pocoes, p->eteres);
     printf("----------------------------------------\n");
+}
+
+/* Simbolo de cada tipo de casa no mapa do tabuleiro */
+static char simboloCasa(TipoCasa tipo)
+{
+    switch (tipo)
+    {
+    case CASA_COMBATE:
+        return 'C';
+    case CASA_TESOURO:
+        return 'T';
+    case CASA_CURA:
+        return '+';
+    case CASA_ARMADILHA:
+        return '!';
+    case CASA_CHEFE:
+        return 'B';
+    default:
+        return '.';
+    }
+}
+
+void exibirTabuleiro(const Casa tabuleiro[], int tamanho, int posicao)
+{
+    int i;
+
+    printf("\nMapa: ");
+    for (i = 0; i < tamanho; i++)
+    {
+        printf("[%c]", (i + 1 == posicao) ? '@' : simboloCasa(tabuleiro[i].tipo));
+    }
+    printf("\n  C=Combate T=Tesouro +=Cura !=Armadilha .=Vazia B=Chefe @=Voce\n");
 }
 
 void exibirTelaVitoria(void)
@@ -155,6 +191,7 @@ void exibirTelaDerrota(void)
 }
 
 void limparTela(void)
+/*Função que serve para limpar a tela*/
 {
 #ifdef _WIN32
     system("cls");
@@ -214,5 +251,7 @@ int escolherPersonagem(Personagem *p, int escolha)
     p->manaAtual = p->manaMax;
     p->pocoes = POCOES_INICIAIS;
     p->eteres = ETERES_INICIAIS;
+    p->nivel = 1;
+    p->xp = 0;
     return 1;
 }

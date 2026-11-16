@@ -3,24 +3,33 @@
 #include <time.h>
 #include "estruturas/estruturas.h"
 #include "funcoes/funcoes.h"
+#include "mecanicas/mecanicas.h"
 #include "combate/combate.h"
 
 #define TOTAL_MISSOES 3
-#define TAM_TABULEIRO 15 /* a ultima casa e o covil do chefe */
 #define DADO_MOVIMENTO 6
 #define CURA_SANTUARIO 25
-
-/* Eventos sorteados nas casas intermediarias */
-#define EV_COMBATE 0
-#define EV_TESOURO 1
-#define EV_CURA 2
-#define EV_ARMADILHA 3
-#define EV_VAZIO 4
-#define TOTAL_EVENTOS 5
+#define CASAS_SORTEAVEIS 5 /* CASA_VAZIA ate CASA_ARMADILHA */
 
 /* ====================================================================
- * TABULEIRO: EVENTOS
+ * TABULEIRO: GERACAO E EVENTOS
  * ==================================================================== */
+
+/* Preenche o vetor de casas: eventos sorteados e o chefe na ultima casa */
+static void gerarTabuleiro(Casa tabuleiro[])
+{
+    int i;
+
+    for (i = 0; i < TAM_TABULEIRO; i++)
+    {
+        tabuleiro[i].idCasa = i + 1;
+
+        if (i == TAM_TABULEIRO - 1)
+            tabuleiro[i].tipo = CASA_CHEFE;
+        else
+            tabuleiro[i].tipo = (TipoCasa)(rand() % CASAS_SORTEAVEIS);
+    }
+}
 
 static void eventoChefe(Personagem *p, int fase)
 {
@@ -74,7 +83,7 @@ static void eventoArmadilha(Personagem *p)
 {
     int dano = configDificuldade()->danoArmadilha;
 
-    p->vidaAtual -= dano;
+    receberDano(p, dano);
     printf("[ARMADILHA] Voce ativou uma runa de malandragem demoniaca! Perdeu %d de HP.\n", dano);
     pausar();
 }
@@ -85,22 +94,27 @@ static void eventoVazio(void)
     pausar();
 }
 
-static void sortearEvento(Personagem *p, int fase)
+/* Executa o evento correspondente ao tipo da casa */
+static void executarEvento(Personagem *p, const Casa *casa, int fase)
 {
-    switch (rand() % TOTAL_EVENTOS)
+    switch (casa->tipo)
     {
-    case EV_COMBATE:
+    case CASA_COMBATE:
         eventoCombate(p, fase);
         break;
-    case EV_TESOURO:
+    case CASA_TESOURO:
         eventoTesouro(p);
         break;
-    case EV_CURA:
+    case CASA_CURA:
         eventoCura(p);
         break;
-    case EV_ARMADILHA:
+    case CASA_ARMADILHA:
         eventoArmadilha(p);
         break;
+    case CASA_CHEFE:
+        eventoChefe(p, fase);
+        break;
+    case CASA_VAZIA:
     default:
         eventoVazio();
         break;
@@ -111,7 +125,7 @@ static void sortearEvento(Personagem *p, int fase)
  * TABULEIRO: PERCURSO DA FASE
  * ==================================================================== */
 
-/* Rola o d6, avanca e trava na ultima casa */
+/* Rola o d6, avanca e trava na ultima casa, só avança quando matar o chefão */
 static int avancarCasa(int posicao)
 {
     int dado = rolarDado(DADO_MOVIMENTO);
@@ -128,20 +142,21 @@ static int avancarCasa(int posicao)
 
 static void iniciarFase(Personagem *p, const Missao *missao)
 {
+    Casa tabuleiro[TAM_TABULEIRO];
     int posicao = 0;
+
+    gerarTabuleiro(tabuleiro);
 
     exibirBanner("INICIO DE FASE");
     printf(" FASE %d\n Missao: %s\n", missao->idFase, missao->descricao);
+    exibirTabuleiro(tabuleiro, TAM_TABULEIRO, posicao);
     pausar();
 
     while (posicao < TAM_TABULEIRO && p->vidaAtual > 0)
     {
         posicao = avancarCasa(posicao);
-
-        if (posicao == TAM_TABULEIRO)
-            eventoChefe(p, missao->idFase);
-        else
-            sortearEvento(p, missao->idFase);
+        exibirTabuleiro(tabuleiro, TAM_TABULEIRO, posicao);
+        executarEvento(p, &tabuleiro[posicao - 1], missao->idFase);
     }
 
     if (p->vidaAtual > 0)
@@ -237,6 +252,7 @@ static void exibirDesfecho(const Personagem *jogador, int missoesConcluidas)
         printf(" O submundo prevalecera nesta era. (Missoes: %d/%d)\n",
                missoesConcluidas, TOTAL_MISSOES);
     }
+    exibirStatusPersonagem(jogador);
     pausar();
 }
 

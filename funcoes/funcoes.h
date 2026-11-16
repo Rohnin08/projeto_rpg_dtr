@@ -11,6 +11,7 @@ void exibirMenuPrincipal(void);
 void exibirMenuSelecao(void);
 void exibirMenuDificuldade(void);
 void exibirStatusPersonagem(const Personagem *p);
+void exibirTabuleiro(const Casa tabuleiro[], int tamanho, int posicao);
 void exibirTelaVitoria(void);
 void exibirTelaDerrota(void);
 void limparTela(void);

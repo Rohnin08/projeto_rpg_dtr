@@ -5,8 +5,12 @@
 
 /*
  * Regras numericas do jogo, sem entrada/saida de combate:
- * dano, criticos, esquiva, fuga, efeitos de roupas e recompensas.
+ * dano, criticos, esquiva, fuga, efeitos de roupas, XP/nivel e recompensas.
  */
+
+/* Aplicam dano via ponteiro (a vida nunca fica negativa) */
+void receberDano(Personagem *p, int dano);
+void danoNoMonstro(Monstro *m, int dano);
 
 /*
  * Resolve um ataque considerando o d20:
@@ -31,7 +35,10 @@ int chanceFuga(const Personagem *p, const Monstro *m);
 /* Retorna 1 com probabilidade chance% */
 int sortearChance(int chance);
 
-/* Recompensa apos vencer um demonio (comum ou chefe) */
+/* Concede XP e sobe de nivel quando atinge o limite (atualiza atributos) */
+void ganharXP(Personagem *p, int xp);
+
+/* Recompensa apos vencer um demonio (XP + bonus comum ou de chefe) */
 void aplicarRecompensa(Personagem *p, Monstro *m, int fase, int ehChefe);
 
 #endif /* MECANICAS_H */
