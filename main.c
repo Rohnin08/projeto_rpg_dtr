@@ -3,11 +3,246 @@
 #include <time.h>
 #include "estruturas/estruturas.h"
 #include "funcoes/funcoes.h"
-#include "mecanicas/mecanicas.h"
+#include "combate/combate.h"
+
+#define TOTAL_MISSOES 3
+#define TAM_TABULEIRO 15 /* a ultima casa e o covil do chefe */
+#define DADO_MOVIMENTO 6
+#define CURA_SANTUARIO 25
+
+/* Eventos sorteados nas casas intermediarias */
+#define EV_COMBATE 0
+#define EV_TESOURO 1
+#define EV_CURA 2
+#define EV_ARMADILHA 3
+#define EV_VAZIO 4
+#define TOTAL_EVENTOS 5
+
+/* ====================================================================
+ * TABULEIRO: EVENTOS
+ * ==================================================================== */
+
+static void eventoChefe(Personagem *p, int fase)
+{
+    Monstro boss;
+
+    printf("[CONFRONTO FINAL] Voce encontrou o general demoniaco desta regiao!\n");
+    gerarMonstro(&boss, fase, 2);
+    executarCombate(p, &boss, fase, 1);
+}
+
+static void eventoCombate(Personagem *p, int fase)
+{
+    Monstro m;
+
+    printf("[EVENTO DE COMBATE] Um demonio selvagem apareceu para bloquear seu caminho!\n");
+    gerarMonstro(&m, fase, rand() % 2);
+    executarCombate(p, &m, fase, 0);
+}
+
+static void eventoTesouro(Personagem *p)
+{
+    printf("[EVENTO DE TESOURO] Voce encontrou um amuleto sagrado esquecido!\n");
+    p->forca += 1;
+    p->inteligencia += 1;
+    printf(">> Sua sintonia espiritual aumentou (+1 Forca, +1 Inteligencia).\n");
+
+    if (rand() % 2 == 0)
+    {
+        p->pocoes++;
+        printf("Item bonus encontrado: +1 Pocao (Total: %d)!\n", p->pocoes);
+    }
+    else
+    {
+        p->eteres++;
+        printf("Item bonus encontrado: +1 Eter (Total: %d)!\n", p->eteres);
+    }
+    pausar();
+}
+
+static void eventoCura(Personagem *p)
+{
+    p->vidaAtual = restaurar(p->vidaAtual, p->vidaMax, CURA_SANTUARIO);
+    p->manaAtual = p->manaMax;
+
+    printf("[EVENTO DE CURA] Voce encontrou um santuario de purificacao! HP (%d/%d) e MP (%d/%d) restaurados.\n",
+           p->vidaAtual, p->vidaMax, p->manaAtual, p->manaMax);
+    pausar();
+}
+
+static void eventoArmadilha(Personagem *p)
+{
+    int dano = configDificuldade()->danoArmadilha;
+
+    p->vidaAtual -= dano;
+    printf("[ARMADILHA] Voce ativou uma runa de malandragem demoniaca! Perdeu %d de HP.\n", dano);
+    pausar();
+}
+
+static void eventoVazio(void)
+{
+    printf("[EVENTO VAZIO] Um silencio pesado e o eco de sussurros sombrios cercam o local...\n");
+    pausar();
+}
+
+static void sortearEvento(Personagem *p, int fase)
+{
+    switch (rand() % TOTAL_EVENTOS)
+    {
+    case EV_COMBATE:
+        eventoCombate(p, fase);
+        break;
+    case EV_TESOURO:
+        eventoTesouro(p);
+        break;
+    case EV_CURA:
+        eventoCura(p);
+        break;
+    case EV_ARMADILHA:
+        eventoArmadilha(p);
+        break;
+    default:
+        eventoVazio();
+        break;
+    }
+}
+
+/* ====================================================================
+ * TABULEIRO: PERCURSO DA FASE
+ * ==================================================================== */
+
+/* Rola o d6, avanca e trava na ultima casa */
+static int avancarCasa(int posicao)
+{
+    int dado = rolarDado(DADO_MOVIMENTO);
+
+    posicao += dado;
+    if (posicao > TAM_TABULEIRO)
+        posicao = TAM_TABULEIRO;
+
+    printf("\n----------------------------------------------------\n");
+    printf("Voce avancou %d casas no territorio. Posicao atual: %d/%d\n",
+           dado, posicao, TAM_TABULEIRO);
+    return posicao;
+}
+
+static void iniciarFase(Personagem *p, const Missao *missao)
+{
+    int posicao = 0;
+
+    exibirBanner("INICIO DE FASE");
+    printf(" FASE %d\n Missao: %s\n", missao->idFase, missao->descricao);
+    pausar();
+
+    while (posicao < TAM_TABULEIRO && p->vidaAtual > 0)
+    {
+        posicao = avancarCasa(posicao);
+
+        if (posicao == TAM_TABULEIRO)
+            eventoChefe(p, missao->idFase);
+        else
+            sortearEvento(p, missao->idFase);
+    }
+
+    if (p->vidaAtual > 0)
+    {
+        printf("\n[REGIAO LIBERTADA] Voce concluiu com sucesso a Fase %d!\n", missao->idFase);
+        pausar();
+    }
+}
+
+/* ====================================================================
+ * MENUS E CAMPANHA
+ * ==================================================================== */
+
+/* Insiste ate o usuario escolher um exterminador valido */
+static void selecionarExterminador(Personagem *jogador)
+{
+    int valido = 0;
+
+    while (!valido)
+    {
+        exibirMenuSelecao();
+        valido = escolherPersonagem(jogador, lerInteiro());
+
+        if (!valido)
+        {
+            printf("\nPersonagem fora do escopo! Tente novamente (1 a %d).\n", TOTAL_PERSONAGENS);
+        }
+    }
+
+    printf("\n>> Personagem selecionado com sucesso!\n");
+    exibirStatusPersonagem(jogador);
+    pausar();
+}
+
+/* Insiste ate o usuario escolher uma dificuldade valida */
+static void selecionarDificuldade(void)
+{
+    int escolha;
+
+    do
+    {
+        exibirMenuDificuldade();
+        escolha = lerInteiro();
+
+        if (escolha < DIF_FACIL || escolha > DIF_DIFICIL)
+        {
+            printf("\nDificuldade invalida! Tente novamente (1 a 3).\n");
+        }
+    } while (escolha < DIF_FACIL || escolha > DIF_DIFICIL);
+
+    definirDificuldade(escolha);
+    printf("\n>> Dificuldade selecionada: %s\n", nomeDificuldade());
+    pausar();
+}
+
+/* Executa as 3 missoes em sequencia; retorna quantas foram concluidas */
+static int executarCampanha(Personagem *jogador)
+{
+    Missao missoes[TOTAL_MISSOES] = {
+        {1, "Beco das Almas Perdidas - Encontrar a fenda principal e derrotar Malphas.", 0},
+        {2, "Ruinas do Purgatorio - Desbancar as legioes medias e vencer Astaroth.", 0},
+        {3, "Trono do Lorde Demonio - Enfrentar Satanael e salvar o mundo!", 0}};
+
+    int concluidas = 0;
+
+    for (int i = 0; i < TOTAL_MISSOES; i++)
+    {
+        iniciarFase(jogador, &missoes[i]);
+
+        if (jogador->vidaAtual <= 0)
+        {
+            break; /* o jogador morreu: encerra a campanha */
+        }
+
+        missoes[i].concluida = 1;
+        concluidas++;
+    }
+
+    return concluidas;
+}
+
+static void exibirDesfecho(const Personagem *jogador, int missoesConcluidas)
+{
+    if (jogador->vidaAtual > 0)
+    {
+        exibirBanner("PARABENS, EXTERMINADOR!");
+        printf(" Voce derrotou Satanael e fechou os portoes do inferno!\n");
+        printf(" Missoes concluidas: %d/%d\n", missoesConcluidas, TOTAL_MISSOES);
+    }
+    else
+    {
+        exibirBanner("GAME OVER: SUA ALMA FOI CONSUMIDA PELAS TREVAS...");
+        printf(" O submundo prevalecera nesta era. (Missoes: %d/%d)\n",
+               missoesConcluidas, TOTAL_MISSOES);
+    }
+    pausar();
+}
 
 int main(void)
 {
-    // Inicializa a semente para a geracao de numeros aleatorios (dados e eventos)
+    /* Semente para dados e eventos aleatorios */
     srand((unsigned int)time(NULL));
 
     Personagem jogador;
@@ -16,91 +251,14 @@ int main(void)
     do
     {
         exibirMenuPrincipal();
-        if (scanf("%d", &opcaoMenu) != 1)
-        {
-            printf("\nEntrada invalida! Digite apenas numeros.\n");
-            while (getchar() != '\n')
-                ; // Limpa o buffer do teclado
-            continue;
-        }
+        opcaoMenu = lerInteiro();
 
         if (opcaoMenu == 1)
         {
-            int escolhaClasse = 0;
-
-            printf("\n====================================================\n");
-            printf(" ESCOLHA SEU EXTERMINADOR\n");
-            printf("====================================================\n");
-            printf("[1] Ken Matsudaira - Alta Forca e Resistencia\n");
-            printf("[2] Satoshi Hasegawa - Alta Agilidade e Precisao\n");
-            printf("[3] Hanae Suda - Alta Inteligencia e Dano Espiritual\n");
-
-            // Insiste ate o usuario digitar uma classe valida (KEN=1 a HANAE=3)
-            while (1)
-            {
-                printf("Escolha seu personagem (1-3): ");
-
-                if (scanf("%d", &escolhaClasse) != 1)
-                {
-                    printf("\nEntrada invalida! Digite apenas numeros (1, 2 ou 3).\n\n");
-                    while (getchar() != '\n')
-                        ;
-                    continue;
-                }
-
-                if (escolhaClasse >= KEN && escolhaClasse <= HANAE)
-                {
-                    break;
-                }
-
-                printf("\nPersonagem fora do escopo! Tente novamente (1 a 3).\n\n");
-            }
-
-            escolherPersonagem(&jogador, escolhaClasse);
-
-            printf("\n>> Personagem selecionado com sucesso!\n");
-            exibirStatusPersonagem(&jogador);
-            pausar();
-
-            // Inicializa as 3 missoes usando a struct do estruturas.h
-            Missao missoes[3] = {
-                {1, "Beco das Almas Perdidas - Encontrar a fenda principal e derrotar Malphas.", 0},
-                {2, "Ruinas do Purgatorio - Desbancar as legioes medias e vencer Astaroth.", 0},
-                {3, "Trono do Lorde Demonio - Enfrentar Satanael e salvar o mundo!", 0}};
-
-            // Executa as 3 fases em sequencia sem usar goto
-            int missoesConcluidas = 0;
-            for (int i = 0; i < 3; i++)
-            {
-                iniciarFase(&jogador, &missoes[i]);
-
-                if (jogador.vidaAtual <= 0)
-                {
-                    break; // Sai do loop imediatamente se o jogador morrer
-                }
-
-                missoes[i].concluida = 1;
-                missoesConcluidas++;
-            }
-
-            // Verificacao final de vitoria ou derrota
-            if (jogador.vidaAtual > 0)
-            {
-                printf("\n====================================================\n");
-                printf(" PARABENS, EXTERMINADOR!\n");
-                printf(" Voce derrotou Satanael e fechou os portoes do inferno!\n");
-                printf(" Missoes concluidas: %d/3\n", missoesConcluidas);
-                printf("====================================================\n");
-            }
-            else
-            {
-                printf("\n====================================================\n");
-                printf(" GAME OVER: SUA ALMA FOI CONSUMIDA PELAS TREVAS...\n");
-                printf(" O submundo prevalecera nesta era. (Missoes: %d/3)\n", missoesConcluidas);
-                printf("====================================================\n");
-            }
-
-            pausar();
+            selecionarExterminador(&jogador);
+            selecionarDificuldade();
+            int concluidas = executarCampanha(&jogador);
+            exibirDesfecho(&jogador, concluidas);
         }
         else if (opcaoMenu == 2)
         {

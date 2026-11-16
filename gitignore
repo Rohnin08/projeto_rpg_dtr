@@ -1,0 +1,40 @@
+# Executaveis gerados
+*.exe
+*.out
+*.app
+exterminadores
+
+# Arquivos objeto e bibliotecas compiladas
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+
+# Arquivos de depuracao e profiling
+*.gdb
+*.dSYM/
+*.prof
+*.gcda
+*.gcno
+*.gcov
+
+# Arquivos temporarios e backups
+*.tmp
+*.temp
+*.bak
+*~
+*.swp
+*.swo
+
+# Configuracoes de editores e IDEs
+.vscode/
+.idea/
+*.code-workspace
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini

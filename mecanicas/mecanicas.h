@@ -3,19 +3,35 @@
 
 #include "estruturas.h"
 
-/* Numero de casas de cada fase (a ultima e o covil do chefe) */
-#define TAM_TABULEIRO 15
+/*
+ * Regras numericas do jogo, sem entrada/saida de combate:
+ * dano, criticos, esquiva, fuga, efeitos de roupas e recompensas.
+ */
 
-/* Preenche o monstro conforme a fase (1-3) e o indice (0-1 comuns, 2 chefe) */
-void gerarMonstro(Monstro *m, int fase, int indice);
+/*
+ * Resolve um ataque considerando o d20:
+ *  - 1 natural: falha critica (retorna 0)
+ *  - 20 natural: acerto critico (dano dobrado, *critico = 1)
+ *  - demais: dano = ataque - defesa, minimo 1
+ */
+int resolverAtaque(int dado, double ataque, int defesa, int *critico);
 
-/* Combate por turnos. ehChefe = 1 bloqueia a fuga */
-void executarCombate(Personagem *p, Monstro *m, int fase, int ehChefe);
+/* Custo em MP da habilidade especial (reduzido por algumas roupas) */
+int custoEspecial(const Personagem *p);
+
+/* Dano fixo absorvido pela roupa equipada em cada ataque recebido */
+int reducaoDanoRoupa(const Personagem *p);
+
+/* Chance (%) de o jogador esquivar de um ataque do demonio (inclui bonus da roupa) */
+int chanceEsquiva(const Personagem *p, const Monstro *m);
+
+/* Chance (%) de o jogador conseguir fugir */
+int chanceFuga(const Personagem *p, const Monstro *m);
+
+/* Retorna 1 com probabilidade chance% */
+int sortearChance(int chance);
 
 /* Recompensa apos vencer um demonio (comum ou chefe) */
 void aplicarRecompensa(Personagem *p, Monstro *m, int fase, int ehChefe);
-
-/* Percorre o tabuleiro linear de uma fase ate o chefe ou ate o jogador cair */
-void iniciarFase(Personagem *p, const Missao *missao);
 
 #endif /* MECANICAS_H */

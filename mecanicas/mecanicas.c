@@ -6,102 +6,63 @@
 #include "funcoes.h"
 #include "mecanicas.h"
 
-/* ====================================================================
- * CONSTANTES
- * ==================================================================== */
+/* CONSTANTES */
 
-#define CUSTO_ESPECIAL 10
-#define CUSTO_POCAO 5 /* a documentacao preve 5 MP; use 0 para desativar */
-#define PENALIDADE_FUGA 15
-#define DANO_ARMADILHA 12
-#define CURA_SANTUARIO 25
-#define FRACAO_ITEM 0.25
-#define MULT_ESPECIAL 1.5
-#define DADO_COMBATE 20
-#define DADO_MOVIMENTO 6
+#define CUSTO_ESPECIAL_BASE 10
 
-/* Eventos sorteados nas casas intermediarias */
-#define EV_COMBATE 0
-#define EV_TESOURO 1
-#define EV_CURA 2
-#define EV_ARMADILHA 3
-#define EV_VAZIO 4
-#define TOTAL_EVENTOS 5
+/* Criticos e falhas no d20 */
+#define ACERTO_CRITICO 20
+#define FALHA_CRITICA 1
+#define MULT_CRITICO 2
 
-/* ====================================================================
- * DADOS ESTATICOS (criados uma unica vez)
- * ==================================================================== */
+/* Esquiva do jogador: 5% por ponto de Agilidade acima do demonio (max 50%) */
+#define ESQUIVA_POR_AGI 5
+#define ESQUIVA_MAX 50
 
-/* Ordem: {vidaBase, forca, defesa, agilidade} */
-static const int atributosBase[3][3][4] = {
-    /* Fase 1 */
-    {{30, 8, 4, 5}, {45, 11, 6, 8}, {70, 14, 8, 10}},
-    /* Fase 2 */
-    {{60, 15, 9, 6}, {75, 18, 10, 14}, {100, 22, 12, 12}},
-    /* Fase 3 */
-    {{90, 24, 14, 9}, {120, 28, 18, 4}, {180, 35, 20, 15}}};
+/* Fuga: 50% base +/- 5% por ponto de diferenca de Agilidade (20% a 90%) */
+#define FUGA_BASE 50
+#define FUGA_POR_AGI 5
+#define FUGA_MIN 20
+#define FUGA_MAX 90
 
-static const char *nomesMonstros[3][3] = {
-    /* Fase 1 */
-    {"Diabrete", "Possuido Infernal", "Malphas, O Vigia das Fendas"},
-    /* Fase 2 */
-    {"Hellhound", "Sucubo", "Astaroth, O Duque das Cinzas"},
-    /* Fase 3 */
-    {"Berserker Abissal", "Guardiao de Obsidiana", "Satanael, O Principe do Submundo"}};
+/* DADOS ESTATICOS */
 
 /* [Classe 0-2][Chefe 0-1] */
-static const char *armasEvoluidas[3][2] = {
-    {"Katana Amaldicoada Muramasa", "Espada Divina Ame-no-Habakiri"},
-    {"Pistolas de Prata Consagrada", "Canhoes Arcanos Seraphim"},
-    {"Grimorio das Chamas Puras", "Tomo Supremo Akashico"}};
+static const Arma armas[3][2] = {
+    /* Ken Matsudaira */
+    {{"Katana Amaldicoada Muramasa", 0, 0, 3, 0, 0, 0},
+     {"Espada Divina Ame-no-Habakiri", 0, 0, 4, 0, 1, 0}},
+    /* Satoshi Hasegawa */
+    {{"Pistolas de Prata Consagrada", 0, 0, 2, 0, 2, 0},
+     {"Canhoes Arcanos Seraphim", 0, 0, 3, 0, 2, 0}},
+    /* Hanae Suda */
+    {{"Grimorio das Chamas Puras", 0, 5, 0, 0, 0, 3},
+     {"Tomo Supremo Akashico", 0, 10, 0, 0, 0, 4}}};
+
+/* [Classe 0-2][Nivel 0-2]: nivel 0 e a roupa inicial, 1 e 2 vem dos chefes */
+static const Roupa roupas[3][3] = {
+    /* Ken Matsudaira */
+    {{"Camiseta", 0, 0, 0, 0, 0, 0, 0, 0, 0, "Nenhum"},
+     {"Haori do Exterminador", 10, 0, 0, 2, 0, 0, 2, 0, 0,
+      "Couraca Espiritual: -2 de dano recebido em cada ataque"},
+     {"Armadura Kabuto Sagrada", 15, 0, 1, 3, 0, 0, 4, 0, 0,
+      "Couraca Espiritual: -4 de dano recebido em cada ataque"}},
+    /* Satoshi Hasegawa */
+    {{"Casaco", 0, 0, 0, 0, 0, 0, 0, 0, 0, "Nenhum"},
+     {"Sobretudo Runico", 0, 0, 0, 1, 2, 0, 0, 10, 0,
+      "Passos Fantasmas: +10% de chance de esquiva"},
+     {"Manto das Mil Balas", 0, 0, 1, 0, 3, 0, 0, 20, 0,
+      "Passos Fantasmas: +20% de chance de esquiva"}},
+    /* Hanae Suda */
+    {{"Vestido", 0, 0, 0, 0, 0, 0, 0, 0, 0, "Nenhum"},
+     {"Vestido de Vestal Consagrado", 5, 0, 0, 0, 0, 2, 0, 0, 2,
+      "Fluxo Arcano: habilidade especial custa 2 MP a menos"},
+     {"Veste Astral das Chamas Puras", 0, 10, 0, 0, 0, 3, 0, 0, 4,
+      "Fluxo Arcano: habilidade especial custa 4 MP a menos"}}};
 
 /* ====================================================================
- * UTILITARIOS INTERNOS
+ * CLASSE E ROUPA
  * ==================================================================== */
-
-static int limitar(int valor, int minimo, int maximo)
-{
-    if (valor < minimo)
-        return minimo;
-    if (valor > maximo)
-        return maximo;
-    return valor;
-}
-
-/* Dano = ataque - defesa, com minimo garantido de 1 */
-static int calcularDano(double ataque, int defesa)
-{
-    return (int)fmax(1.0, ataque - defesa);
-}
-
-/* Percentual de um valor, arredondado para cima */
-static int percentualCeil(int valor, double fracao)
-{
-    return (int)ceil(valor * fracao);
-}
-
-/* Soma valor a atual sem ultrapassar o maximo */
-static int restaurar(int atual, int maximo, int valor)
-{
-    return (atual + valor > maximo) ? maximo : atual + valor;
-}
-
-/* Le um inteiro do teclado; retorna -1 se a entrada for invalida */
-static int lerAcao(void)
-{
-    int valor;
-
-    if (scanf("%d", &valor) != 1)
-    {
-        printf("Entrada invalida!\n");
-        while (getchar() != '\n')
-            ;
-        return -1;
-    }
-    while (getchar() != '\n')
-        ;
-    return valor;
-}
 
 /* Indice da classe (0 Ken, 1 Satoshi, 2 Hanae) a partir do nome */
 static int indiceClasse(const Personagem *p)
@@ -113,215 +74,72 @@ static int indiceClasse(const Personagem *p)
     return 0;
 }
 
-/* ====================================================================
- * GERACAO DE MONSTROS
- * ==================================================================== */
-
-void gerarMonstro(Monstro *m, int fase, int indice)
+/* Roupa atualmente equipada (assume a inicial se o nome nao for encontrado) */
+static const Roupa *roupaEquipada(const Personagem *p)
 {
-    int fIdx = limitar(fase - 1, 0, 2);
-    int mIdx = limitar(indice, 0, 2);
-    double fator = pow(1.25, fIdx);
+    int classe = indiceClasse(p);
+    int i;
 
-    strcpy(m->nome, nomesMonstros[fIdx][mIdx]);
-
-    m->vidaMax = (int)(atributosBase[fIdx][mIdx][0] * fator);
-    m->vidaAtual = m->vidaMax;
-    m->forca = atributosBase[fIdx][mIdx][1];
-    m->defesa = atributosBase[fIdx][mIdx][2];
-    m->agilidade = atributosBase[fIdx][mIdx][3];
-}
-
-/* ====================================================================
- * COMBATE
- * ==================================================================== */
-
-static void exibirMenuCombate(const Personagem *p, const Monstro *m)
-{
-    printf("\n--- Status do Combate ---\n");
-    printf("Seu HP: %d/%d | Seu MP: %d/%d | %s HP: %d/%d\n",
-           p->vidaAtual, p->vidaMax, p->manaAtual, p->manaMax,
-           m->nome, m->vidaAtual, m->vidaMax);
-    printf("[1] Atacar Normal\n");
-    printf("[2] Usar Habilidade Especial (%s) [Custo: %d MP]\n",
-           p->habilidade, CUSTO_ESPECIAL);
-    printf("[3] Usar Pocao (+%d HP / 25%%) [Custo: %d MP] [Restantes: %d]\n",
-           percentualCeil(p->vidaMax, FRACAO_ITEM), CUSTO_POCAO, p->pocoes);
-    printf("[4] Usar Eter (+%d MP / 25%%) [Restantes: %d]\n",
-           percentualCeil(p->manaMax, FRACAO_ITEM), p->eteres);
-    printf("[5] Tentar Fugir\n");
-    printf("Escolha sua acao: ");
-}
-
-/* Cada acao retorna 1 se gastou o turno, 0 se o jogador deve escolher de novo */
-
-static int acaoAtacar(Personagem *p, Monstro *m)
-{
-    int dado = rolarDado(DADO_COMBATE);
-    int ataqueTotal = dado + p->forca;
-    int dano = calcularDano(ataqueTotal, m->defesa);
-
-    m->vidaAtual -= dano;
-
-    printf(">> Voce atacou! Rolou %d no d20 + forca (%d) = Ataque %d.\n",
-           dado, p->forca, ataqueTotal);
-    printf(">> Causou %d de dano espiritual em %s!\n", dano, m->nome);
-    return 1;
-}
-
-static int acaoHabilidade(Personagem *p, Monstro *m)
-{
-    int dado, ataqueTotal, dano;
-
-    if (p->manaAtual < CUSTO_ESPECIAL)
+    for (i = 0; i < 3; i++)
     {
-        printf(">> MP INSUFICIENTE! Voce nao tem energia espiritual para usar '%s'!\n",
-               p->habilidade);
+        if (strcmp(p->roupa, roupas[classe][i].nome) == 0)
+            return &roupas[classe][i];
+    }
+    return &roupas[classe][0];
+}
+
+int custoEspecial(const Personagem *p)
+{
+    return limitar(CUSTO_ESPECIAL_BASE - roupaEquipada(p)->reducaoCustoEspecial,
+                   1, CUSTO_ESPECIAL_BASE);
+}
+
+int reducaoDanoRoupa(const Personagem *p)
+{
+    return roupaEquipada(p)->reducaoDano;
+}
+
+/* ATAQUE, ESQUIVA E FUGA */
+
+/* Dano = ataque - defesa, com minimo garantido de 1 */
+static int calcularDano(double ataque, int defesa)
+{
+    return (int)fmax(1.0, ataque - defesa);
+}
+
+int resolverAtaque(int dado, double ataque, int defesa, int *critico)
+{
+    int dano;
+
+    *critico = 0;
+    if (dado == FALHA_CRITICA)
         return 0;
+
+    dano = calcularDano(ataque, defesa);
+    if (dado == ACERTO_CRITICO)
+    {
+        dano *= MULT_CRITICO;
+        *critico = 1;
     }
-
-    p->manaAtual -= CUSTO_ESPECIAL;
-
-    dado = rolarDado(DADO_COMBATE);
-    ataqueTotal = dado + p->inteligencia + p->forca;
-    dano = calcularDano(ataqueTotal * MULT_ESPECIAL, m->defesa);
-    m->vidaAtual -= dano;
-
-    printf(">> Usou '%s' (-%d MP)! Rolou %d.\n", p->habilidade, CUSTO_ESPECIAL, dado);
-    printf(">> Dano critico de exorcismo de %d em %s!\n", dano, m->nome);
-    return 1;
+    return dano;
 }
 
-static int acaoPocao(Personagem *p)
+int chanceEsquiva(const Personagem *p, const Monstro *m)
+/*Utiliza uma operação para */
 {
-    int cura = percentualCeil(p->vidaMax, FRACAO_ITEM);
+    int chance = ESQUIVA_POR_AGI * (p->agilidade - m->agilidade) + roupaEquipada(p)->esquivaExtra;
 
-    if (p->pocoes <= 0)
-    {
-        printf(">> Voce nao possui mais Pocoes!\n");
-        return 0;
-    }
-    if (p->vidaAtual == p->vidaMax)
-    {
-        printf(">> Seu HP ja esta no maximo!\n");
-        return 0;
-    }
-    if (p->manaAtual < CUSTO_POCAO)
-    {
-        printf(">> MP INSUFICIENTE! A Pocao exige %d MP para canalizar a cura.\n", CUSTO_POCAO);
-        return 0;
-    }
-
-    p->pocoes--;
-    p->manaAtual -= CUSTO_POCAO;
-    p->vidaAtual = restaurar(p->vidaAtual, p->vidaMax, cura);
-
-    printf(">> Voce bebeu uma Pocao (+%d HP, -%d MP)! HP atual: %d/%d (Restam %d pocoes).\n",
-           cura, CUSTO_POCAO, p->vidaAtual, p->vidaMax, p->pocoes);
-    return 1;
+    return limitar(chance, 0, ESQUIVA_MAX);
 }
 
-static int acaoEter(Personagem *p)
+int chanceFuga(const Personagem *p, const Monstro *m)
 {
-    int recupera = percentualCeil(p->manaMax, FRACAO_ITEM);
-
-    if (p->eteres <= 0)
-    {
-        printf(">> Voce nao possui mais Eteres!\n");
-        return 0;
-    }
-    if (p->manaAtual == p->manaMax)
-    {
-        printf(">> Seu MP ja esta no maximo!\n");
-        return 0;
-    }
-
-    p->eteres--;
-    p->manaAtual = restaurar(p->manaAtual, p->manaMax, recupera);
-
-    printf(">> Voce usou um Eter (+%d MP)! MP atual: %d/%d (Restam %d eteres).\n",
-           recupera, p->manaAtual, p->manaMax, p->eteres);
-    return 1;
+    return limitar(FUGA_BASE + FUGA_POR_AGI * (p->agilidade - m->agilidade), FUGA_MIN, FUGA_MAX);
 }
 
-/* Retorna 1 se conseguiu fugir (combate termina); 0 caso contrario */
-static int acaoFugir(Personagem *p, int ehChefe)
+int sortearChance(int chance)
 {
-    if (ehChefe)
-    {
-        printf(">> Voce nao pode fugir de um General Demoniaco!\n");
-        return 0;
-    }
-
-    printf(">> Voce recuou taticamente do combate! (-%d HP)\n", PENALIDADE_FUGA);
-    p->vidaAtual -= PENALIDADE_FUGA;
-    pausar();
-    return 1;
-}
-
-static void turnoDemonio(Personagem *p, const Monstro *m)
-{
-    int dado = rolarDado(DADO_COMBATE);
-    int ataque = dado + m->forca;
-    int dano = calcularDano(ataque, p->defesa);
-
-    p->vidaAtual -= dano;
-
-    printf(">> %s contra-atacou! Rolou %d + forca (%d) = Ataque %d.\n",
-           m->nome, dado, m->forca, ataque);
-    printf(">> Voce sofreu %d de dano sombrio!\n", dano);
-}
-
-void executarCombate(Personagem *p, Monstro *m, int fase, int ehChefe)
-{
-    p->manaAtual = p->manaMax; /* MP restaurado no inicio de cada combate */
-
-    printf("\n====================================================\n");
-    printf(" ENCONTRO COM DEMONIO: %s\n", m->nome);
-    printf("====================================================\n");
-
-    while (p->vidaAtual > 0 && m->vidaAtual > 0)
-    {
-        int gastouTurno = 1;
-
-        exibirMenuCombate(p, m);
-
-        switch (lerAcao())
-        {
-        case 1:
-            gastouTurno = acaoAtacar(p, m);
-            break;
-        case 2:
-            gastouTurno = acaoHabilidade(p, m);
-            break;
-        case 3:
-            gastouTurno = acaoPocao(p);
-            break;
-        case 4:
-            gastouTurno = acaoEter(p);
-            break;
-        case 5:
-            if (acaoFugir(p, ehChefe))
-                return; /* fuga bem-sucedida: sem recompensa */
-            gastouTurno = 0;
-            break;
-        case -1:
-            gastouTurno = 0; /* entrada invalida: nao pune o jogador */
-            break;
-        default:
-            printf("Acao desconhecida! O demonio aproveitou sua hesitacao.\n");
-            break;
-        }
-
-        if (gastouTurno && m->vidaAtual > 0)
-            turnoDemonio(p, m);
-    }
-
-    if (p->vidaAtual > 0)
-    {
-        printf("\n[VITORIA] Voce exorcizou %s com sucesso!\n", m->nome);
-        aplicarRecompensa(p, m, fase, ehChefe);
-    }
+    return (rand() % 100) < chance;
 }
 
 /* ====================================================================
@@ -340,9 +158,63 @@ static void aplicarBonusPercentual(Personagem *p, double mult)
     p->inteligencia = (int)ceil(p->inteligencia * mult);
 }
 
+/* Soma bonus fixos aos atributos e restaura HP/MP */
+static void aplicarBonusFixo(Personagem *p, int vida, int mana, int forca,
+                             int defesa, int agilidade, int inteligencia)
+{
+    p->vidaMax += vida;
+    p->vidaAtual = p->vidaMax;
+    p->manaMax += mana;
+    p->manaAtual = p->manaMax;
+    p->forca += forca;
+    p->defesa += defesa;
+    p->agilidade += agilidade;
+    p->inteligencia += inteligencia;
+}
+
+/* Imprime apenas os bonus diferentes de zero */
+static void exibirBonusFixo(const char *origem, int vida, int mana, int forca,
+                            int defesa, int agilidade, int inteligencia)
+{
+    printf(">> Bonus da %s:", origem);
+    if (vida)
+        printf(" +%d HP", vida);
+    if (mana)
+        printf(" +%d MP", mana);
+    if (forca)
+        printf(" +%d Forca", forca);
+    if (defesa)
+        printf(" +%d Defesa", defesa);
+    if (agilidade)
+        printf(" +%d Agilidade", agilidade);
+    if (inteligencia)
+        printf(" +%d Inteligencia", inteligencia);
+    printf("\n");
+}
+
+/* Equipa a arma do chefe (0 ou 1) e aplica os bonus fixos */
 static void evoluirArma(Personagem *p, int indiceChefe)
 {
-    strcpy(p->arma, armasEvoluidas[indiceClasse(p)][indiceChefe]);
+    const Arma *a = &armas[indiceClasse(p)][indiceChefe];
+
+    strcpy(p->arma, a->nome);
+    aplicarBonusFixo(p, a->vida, a->mana, a->forca, a->defesa, a->agilidade, a->inteligencia);
+
+    printf(">> NOVA ARMA EQUIPADA: %s!\n", a->nome);
+    exibirBonusFixo("arma", a->vida, a->mana, a->forca, a->defesa, a->agilidade, a->inteligencia);
+}
+
+/* Equipa a roupa do nivel (indiceChefe + 1) e aplica os bonus fixos */
+static void evoluirRoupa(Personagem *p, int indiceChefe)
+{
+    const Roupa *r = &roupas[indiceClasse(p)][indiceChefe + 1];
+
+    strcpy(p->roupa, r->nome);
+    aplicarBonusFixo(p, r->vida, r->mana, r->forca, r->defesa, r->agilidade, r->inteligencia);
+
+    printf(">> NOVA VESTIMENTA EQUIPADA: %s!\n", r->nome);
+    exibirBonusFixo("roupa", r->vida, r->mana, r->forca, r->defesa, r->agilidade, r->inteligencia);
+    printf(">> EFEITO ESPECIAL: %s\n", r->efeito);
 }
 
 static void recompensaChefe(Personagem *p, int fase)
@@ -352,25 +224,24 @@ static void recompensaChefe(Personagem *p, int fase)
     int porcentagem = (fase == 2) ? 20 : 10;
     double mult = 1.0 + porcentagem / 100.0;
 
-    printf("\n====================================================\n");
-    printf(" RECOMPENSA DE CHEFE: ESSENCIA DEMONIACA ABSORVIDA!\n");
-    printf("====================================================\n");
+    exibirBanner("RECOMPENSA DE CHEFE: ESSENCIA DEMONIACA ABSORVIDA!");
 
     aplicarBonusPercentual(p, mult);
-    evoluirArma(p, indiceChefe);
 
     printf(">> TODOS os seus atributos aumentaram em +%d%% e seu HP/MP foram restaurados!\n",
            porcentagem);
-    printf(">> NOVA ARMA EQUIPADA: %s!\n", p->arma);
+
+    /* Os bonus fixos de arma e roupa entram depois do percentual, sem serem multiplicados */
+    evoluirArma(p, indiceChefe);
+    evoluirRoupa(p, indiceChefe);
+
     exibirStatusPersonagem(p);
     pausar();
 }
 
 static void recompensaFinal(void)
 {
-    printf("\n====================================================\n");
-    printf(" O SENHOR DO SUBMUNDO FOI SELADO DEFINITIVAMENTE!\n");
-    printf("====================================================\n");
+    exibirBanner("O SENHOR DO SUBMUNDO FOI SELADO DEFINITIVAMENTE!");
     pausar();
 }
 
@@ -418,138 +289,4 @@ void aplicarRecompensa(Personagem *p, Monstro *m, int fase, int ehChefe)
         recompensaFinal();
     else
         recompensaChefe(p, fase);
-}
-
-/* ====================================================================
- * EVENTOS DO TABULEIRO
- * ==================================================================== */
-
-static void eventoChefe(Personagem *p, int fase)
-{
-    Monstro boss;
-
-    printf("[CONFRONTO FINAL] Voce encontrou o general demoniaco desta regiao!\n");
-    gerarMonstro(&boss, fase, 2);
-    executarCombate(p, &boss, fase, 1);
-}
-
-static void eventoCombate(Personagem *p, int fase)
-{
-    Monstro m;
-
-    printf("[EVENTO DE COMBATE] Um demonio selvagem apareceu para bloquear seu caminho!\n");
-    gerarMonstro(&m, fase, rand() % 2);
-    executarCombate(p, &m, fase, 0);
-}
-
-static void eventoTesouro(Personagem *p)
-{
-    printf("[EVENTO DE TESOURO] Voce encontrou um amuleto sagrado esquecido!\n");
-    p->forca += 1;
-    p->inteligencia += 1;
-    printf(">> Sua sintonia espiritual aumentou (+1 Forca, +1 Inteligencia).\n");
-
-    if (rand() % 2 == 0)
-    {
-        p->pocoes++;
-        printf("Item bonus encontrado: +1 Pocao (Total: %d)!\n", p->pocoes);
-    }
-    else
-    {
-        p->eteres++;
-        printf("Item bonus encontrado: +1 Eter (Total: %d)!\n", p->eteres);
-    }
-    pausar();
-}
-
-static void eventoCura(Personagem *p)
-{
-    p->vidaAtual = restaurar(p->vidaAtual, p->vidaMax, CURA_SANTUARIO);
-    p->manaAtual = p->manaMax;
-
-    printf("[EVENTO DE CURA] Voce encontrou um santuario de purificacao! HP (%d/%d) e MP (%d/%d) restaurados.\n",
-           p->vidaAtual, p->vidaMax, p->manaAtual, p->manaMax);
-    pausar();
-}
-
-static void eventoArmadilha(Personagem *p)
-{
-    p->vidaAtual -= DANO_ARMADILHA;
-    printf("[ARMADILHA] Voce ativou uma runa de malandragem demoniaca! Perdeu %d de HP.\n",
-           DANO_ARMADILHA);
-    pausar();
-}
-
-static void eventoVazio(void)
-{
-    printf("[EVENTO VAZIO] Um silencio pesado e o eco de sussurros sombrios cercam o local...\n");
-    pausar();
-}
-
-static void sortearEvento(Personagem *p, int fase)
-{
-    switch (rand() % TOTAL_EVENTOS)
-    {
-    case EV_COMBATE:
-        eventoCombate(p, fase);
-        break;
-    case EV_TESOURO:
-        eventoTesouro(p);
-        break;
-    case EV_CURA:
-        eventoCura(p);
-        break;
-    case EV_ARMADILHA:
-        eventoArmadilha(p);
-        break;
-    default:
-        eventoVazio();
-        break;
-    }
-}
-
-/* Rola o d6, avanca e trava na ultima casa */
-static int avancarCasa(int posicao)
-{
-    int dado = rolarDado(DADO_MOVIMENTO);
-
-    posicao += dado;
-    if (posicao > TAM_TABULEIRO)
-        posicao = TAM_TABULEIRO;
-
-    printf("\n----------------------------------------------------\n");
-    printf("Voce avancou %d casas no territorio. Posicao atual: %d/%d\n",
-           dado, posicao, TAM_TABULEIRO);
-    return posicao;
-}
-
-/* ====================================================================
- * GAME LOOP DA FASE
- * ==================================================================== */
-
-void iniciarFase(Personagem *p, const Missao *missao)
-{
-    int posicao = 0;
-
-    printf("\n====================================================\n");
-    printf(" FASE %d\n", missao->idFase);
-    printf(" Missao: %s\n", missao->descricao);
-    printf("====================================================\n");
-    pausar();
-
-    while (posicao < TAM_TABULEIRO && p->vidaAtual > 0)
-    {
-        posicao = avancarCasa(posicao);
-
-        if (posicao == TAM_TABULEIRO)
-            eventoChefe(p, missao->idFase);
-        else
-            sortearEvento(p, missao->idFase);
-    }
-
-    if (p->vidaAtual > 0)
-    {
-        printf("\n[REGIAO LIBERTADA] Voce concluiu com sucesso a Fase %d!\n", missao->idFase);
-        pausar();
-    }
 }

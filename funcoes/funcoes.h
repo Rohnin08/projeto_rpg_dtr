@@ -3,15 +3,36 @@
 
 #include "estruturas.h"
 
-// Exibe o menu principal do jogo
-void exibirMenuPrincipal();
-// Rola um dado(d6 para o tabuleiro e d20 para o combate)
-int rolarDado(int faces);
-// Configura os atributos do personagem com base na escolha do usuário
-void escolherPersonagem(Personagem *p, int escolha);
-// Exibe as informações do personagem
+#define TOTAL_PERSONAGENS 3
+
+/* ---------- Interface ---------- */
+void exibirBanner(const char *titulo);
+void exibirMenuPrincipal(void);
+void exibirMenuSelecao(void);
+void exibirMenuDificuldade(void);
 void exibirStatusPersonagem(const Personagem *p);
-// Pausa a execução do terminal limpado o buffer e guardado o enter do usuário
-void pausar();
-void limparTela();
-#endif
+void exibirTelaVitoria(void);
+void exibirTelaDerrota(void);
+void limparTela(void);
+void pausar(void);
+
+/* ---------- Entrada ---------- */
+void limparBuffer(void);
+int lerInteiro(void);
+
+/* ---------- Utilitarios e inicializacao ---------- */
+int rolarDado(int faces);
+
+/* Limita valor ao intervalo [minimo, maximo] */
+int limitar(int valor, int minimo, int maximo);
+
+/* Soma valor a atual sem ultrapassar o maximo */
+int restaurar(int atual, int maximo, int valor);
+
+/* Percentual de um valor, arredondado para cima */
+int percentualCeil(int valor, double fracao);
+
+/* Retorna 1 se escolha (1 a TOTAL_PERSONAGENS) for valida; 0 caso contrario */
+int escolherPersonagem(Personagem *p, int escolha);
+
+#endif /* FUNCOES_H */

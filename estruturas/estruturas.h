@@ -30,6 +30,22 @@ typedef struct
 
 typedef struct
 {
+    const char *nome;
+    int vida, mana, forca, defesa, agilidade, inteligencia; /* bonus ao equipar */
+    int reducaoDano;                                        /* dano fixo absorvido por ataque */
+    int esquivaExtra;                                       /* % somado a chance de esquiva */
+    int reducaoCustoEspecial;                               /* MP a menos na habilidade especial */
+    const char *efeito;
+} Roupa;
+
+typedef struct
+{
+    const char *nome;
+    int vida, mana, forca, defesa, agilidade, inteligencia;
+} Arma;
+
+typedef struct
+{
     char nome[50];
     int vidaAtual,
         vidaMax,
